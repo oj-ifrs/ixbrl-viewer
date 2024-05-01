@@ -4,6 +4,7 @@ import { DocFrame } from './page_objects/doc_frame.js';
 import { FactDetailsPanel } from './page_objects/fact_details_panel.js';
 import { PuppeteerScreenRecorder } from 'puppeteer-screen-recorder';
 import { Search } from './page_objects/search_panel.js';
+import { Add } from './page_objects/add_panel.js';
 import { Toolbar } from './page_objects/toolbar.js';
 
 export class ViewerPage {
@@ -12,6 +13,7 @@ export class ViewerPage {
     docFrame;
     factDetailsPanel;
     search;
+    add;
     toolbar;
 
     #artifactDirectory = './tests/puppeteer/artifacts';
@@ -33,6 +35,7 @@ export class ViewerPage {
         this.docFrame = new DocFrame(this);
         this.factDetailsPanel = new FactDetailsPanel(this);
         this.search = new Search(this);
+        this.add = new Add(this);
         this.toolbar = new Toolbar(this);
         this.#recorder = new PuppeteerScreenRecorder(this.page);
 

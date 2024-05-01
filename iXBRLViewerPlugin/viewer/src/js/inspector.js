@@ -88,17 +88,20 @@ export class Inspector {
                         }
                     }
                 });
+                $("#inspector .controls .add-button").on("click", function () {
+                    $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode","search-mode"]).toggleClass("add-mode");
+                }); 
                 $("#inspector .controls .search-button").on("click", function () {
-                    $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode"]).toggleClass("search-mode");
+                    $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode","add-mode"]).toggleClass("search-mode");
                 });
                 $("#inspector .controls .summary-button").on("click", function () {
-                    $(this).closest("#inspector").removeClass(["outline-mode", "search-mode"]).toggleClass("summary-mode");
+                    $(this).closest("#inspector").removeClass(["outline-mode", "search-mode","add-mode"]).toggleClass("summary-mode");
                 });
                 $("#inspector .controls .outline-button").on("click", function () {
-                    $(this).closest("#inspector").removeClass(["summary-mode", "search-mode"]).toggleClass("outline-mode");
+                    $(this).closest("#inspector").removeClass(["summary-mode", "search-mode","add-mode"]).toggleClass("outline-mode");
                 });
                 $("#inspector-head .back").on("click", function () {
-                    $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode", "search-mode"]);
+                    $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode", "search-mode","add-mode"]);
                 });
                 $(".popup-trigger").on("mouseenter", function () {
                     $(this).find(".popup-content").show()

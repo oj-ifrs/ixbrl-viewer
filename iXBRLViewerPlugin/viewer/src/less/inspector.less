@@ -330,6 +330,21 @@
         height: 3.2rem;
         margin: 0.8rem 0.9rem;
 
+        .add-button {
+          .square-button();
+
+          position: absolute;
+          top: 0;
+          left: 7.7rem;
+
+          &::before {
+            .icon-tag();
+
+            position: relative;
+          }
+        }
+
+
         .search-button {
           .square-button();
 
@@ -995,6 +1010,16 @@
       }
     }
 
+    &.add-mode {
+      #inspector-head {
+        .controls {
+          .add-button {
+            .square-button.primary();
+          }
+        }
+      }
+    }
+
     &.search-mode {
       #inspector-head {
         .controls {
@@ -1054,6 +1079,10 @@
       }
     }
 
+    &:not(.add-mode) .add-mode-only {
+      display: none;
+    }
+
     &:not(.search-mode) .search-mode-only {
       display: none;
     }
@@ -1066,6 +1095,7 @@
       display: none;
     }
 
+    &.add-mode .fact-mode-only,
     &.search-mode .fact-mode-only,
     &.summary-mode .fact-mode-only,
     &.outline-mode .fact-mode-only {
