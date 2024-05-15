@@ -330,12 +330,32 @@
         height: 3.2rem;
         margin: 0.8rem 0.9rem;
 
+        .save-button {
+          .square-button();
+
+          position: absolute;
+          top: 0;
+          left: 15.9rem;
+
+          &::before {
+            .icon-download();
+
+            position: relative;
+          }
+        }
+      }
+
+      .controls {
+        position: relative;
+        height: 3.2rem;
+        margin: 0.8rem 0.9rem;
+
         .add-button {
           .square-button();
 
           position: absolute;
           top: 0;
-          left: 7.7rem;
+          left: 11.8rem;
 
           &::before {
             .icon-tag();

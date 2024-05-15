@@ -19,7 +19,9 @@ import { MessageBox } from './messagebox.js';
 import { Calculation } from "./calculation.js";
 import { CalculationInspector } from './calculationInspector.js';
 import { ReportSetOutline } from './outline.js';
-import { DIMENSIONS_KEY, DocumentSummary, MEMBERS_KEY, PRIMARY_ITEMS_KEY, TOTAL_KEY } from './summary.js';
+import { DIMENSIONS_KEY, DocumentSummary, MEMBERS_KEY, PRIMARY_ITEMS_KEY, TOTAL_KEY } from './summary.js'
+import { Saver} from "./save.js";
+import { Editor} from "./edit.js";
 
 const SEARCH_PAGE_SIZE = 100
 
@@ -88,18 +90,17 @@ export class Inspector {
                         }
                     }
                 });
-                $("#inspector .controls .add-button").on("click", function () {
-                    $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode","search-mode"]).toggleClass("add-mode");
-                }); 
+
                 $("#inspector .controls .search-button").on("click", function () {
-                    $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode","add-mode"]).toggleClass("search-mode");
+                    $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode"]).toggleClass("search-mode");
                 });
                 $("#inspector .controls .summary-button").on("click", function () {
-                    $(this).closest("#inspector").removeClass(["outline-mode", "search-mode","add-mode"]).toggleClass("summary-mode");
+                    $(this).closest("#inspector").removeClass(["outline-mode", "search-mode"]).toggleClass("summary-mode");
                 });
                 $("#inspector .controls .outline-button").on("click", function () {
-                    $(this).closest("#inspector").removeClass(["summary-mode", "search-mode","add-mode"]).toggleClass("outline-mode");
-                });
+                    $(this).closest("#inspector").removeClass(["summary-mode", "search-mode"]).toggleClass("outline-mode");
+                });                 
+                
                 $("#inspector-head .back").on("click", function () {
                     $(this).closest("#inspector").removeClass(["summary-mode", "outline-mode", "search-mode","add-mode"]);
                 });
@@ -116,6 +117,26 @@ export class Inspector {
 
                 inspector._optionsMenu = new Menu($("#display-options-menu"));
                 inspector.buildDisplayOptionsMenu();
+
+                inspector._save = new Saver()
+                
+                $("#inspector .controls .save-button").on("click", () => {
+                    let frame = $("#ixv #iframe-container").find("iframe");
+                    let h = frame[0].contentDocument.documentElement.outerHTML;
+                    inspector._save.saveFrame(h);
+                });
+
+                inspector._edit = new Editor()
+                $("#inspector .controls .add-button").on("click", function () {   
+                    const frame = viewer.currentDocument();  
+                    const reportIndex = frame.data("report-index");
+                    inspector._edit.addTag(
+                        reportIndex,
+                        frame[0].contentWindow.getSelection(),
+                        viewer,
+                        reportSet
+                    );
+                });
 
                 $("#ixv").localize();
 
@@ -135,6 +156,8 @@ export class Inspector {
                     inspector.initializeViewer();
                     resolve();
                 });
+
+
             });
         });
     }

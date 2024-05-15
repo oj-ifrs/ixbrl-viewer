@@ -79,6 +79,10 @@ def iXBRLViewerCommandLineOptionExtender(parser, *args, **kwargs):
                       action="store_true",
                       dest="useStubViewer",
                       help="Use stub viewer for faster loading of inspector (requires web server)")
+    parser.add_option("--saveJson",
+                      action="store_true",
+                      dest="saveJson",
+                      help="Save the Json to a separate file")
     parser.add_option("--viewer-suffix",
                       action="store",
                       default="",
@@ -116,6 +120,7 @@ def generateViewer(
         features: list[str] | None = None,
         packageDownloadURL: str | None = None,
         copyScript: bool = True,
+        saveJson: bool = False
 ) -> None:
     """
     Generate and save an iXBRL viewer at the given destination (file, directory, or in-memory file) with the given viewer script URL.
@@ -144,8 +149,9 @@ def generateViewer(
         cntlr.addToLog(f"No taxonomy loaded. {abortGenerationMsg}", messageCode=ERROR_MESSAGE_CODE)
         return
     if cntlr.modelManager.modelXbrl.modelDocument.type not in (Type.INLINEXBRL, Type.INLINEXBRLDOCUMENTSET):
-        cntlr.addToLog(f"No inline XBRL document loaded. {abortGenerationMsg}", messageCode=ERROR_MESSAGE_CODE)
-        return
+        if not saveJson:
+            cntlr.addToLog(f"No inline XBRL document loaded. {abortGenerationMsg}", messageCode=ERROR_MESSAGE_CODE)
+            return
 
     copyScriptPath = None
     if copyScript:
@@ -175,7 +181,7 @@ def generateViewer(
         if features:
             for feature in features:
                 viewerBuilder.enableFeature(feature)
-        iv = viewerBuilder.createViewer(scriptUrl=viewerURL, showValidations=showValidationMessages, useStubViewer=useStubViewer, packageDownloadURL=packageDownloadURL)
+        iv = viewerBuilder.createViewer(scriptUrl=viewerURL, showValidations=showValidationMessages, useStubViewer=useStubViewer, packageDownloadURL=packageDownloadURL, saveJson=saveJson)
         if iv is not None:
             iv.save(saveViewerDest, zipOutput=zipViewerOutput, copyScriptPath=copyScriptPath)
     except IXBRLViewerBuilderError as ex:
@@ -204,6 +210,7 @@ def iXBRLViewerCommandLineXbrlRun(cntlr, options, *args, **kwargs):
         zipViewerOutput=options.zipViewerOutput,
         features=getFeaturesFromOptions(options),
         packageDownloadURL=options.packageDownloadURL,
+        saveJson=options.saveJson,
     )
 
 
@@ -225,7 +232,7 @@ def iXBRLViewerSaveCommand(cntlr):
             viewerURL=dialog.scriptUrl(),
             copyScript=dialog.copyScript(),
             zipViewerOutput=dialog.zipViewerOutput(),
-            features=dialog.features(),
+            features=dialog.features()
         )
 
 

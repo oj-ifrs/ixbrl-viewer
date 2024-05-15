@@ -437,6 +437,33 @@ class TestIXBRLViewer:
             ixdsTarget=None,
             urlDocs={}
         )
+        self.modelXbrlTaxonomy = Mock(
+            relationshipSet=relationshipSet_effect,
+            relationshipSets={},
+            baseSets=baseSets,
+            roleTypes=roleTypes,
+            facts=[],
+            info=info_effect,
+            modelDocument=self.modelDocument,
+            modelManager=self.modelManager,
+            ixdsTarget=None,
+            urlDocs=dict((
+                urlDocEntry('/filesystem/local-schema.xsd', Type.SCHEMA),
+                urlDocEntry('https://example.com/remote-schema.xsd', Type.SCHEMA),
+                urlDocEntry('/filesystem/local-label-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkLabelLink),
+                urlDocEntry('https://example.com/remote-label-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkLabelLink),
+                urlDocEntry('/filesystem/local-pres-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkPresentationLink),
+                urlDocEntry('https://example.com/remote-pres-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkPresentationLink),
+                urlDocEntry('/filesystem/local-calc-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkCalculationLink),
+                urlDocEntry('https://example.com/remote-calc-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkCalculationLink),
+                urlDocEntry('/filesystem/local-def-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkDefinitionLink),
+                urlDocEntry('https://example.com/remote-def-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkDefinitionLink),
+                urlDocEntry('/filesystem/local-ref-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkReferenceLink),
+                urlDocEntry('https://example.com/remote-ref-linkbase.xml', Type.LINKBASE, XbrlConst.qnLinkReferenceLink),
+                urlDocEntry('/filesystem/local-unrecognized-linkbase.xml', Type.LINKBASE, qname("{http://www.example.org/linkbase}link:unrecognizedLink")),
+                urlDocEntry('https://example.com/remote-unrecognized-linkbase.xml', Type.LINKBASE, qname("{http://www.example.org/linkbase}link:unrecognizedLink")),
+            ))
+        )
 
         self.cash_concept.modelXbrl = self.modelXbrl_1
         to_concept.modelXbrl = self.modelXbrl_1
@@ -733,3 +760,41 @@ class TestIXBRLViewer:
             assert body[2].prefix is None
             assert body[2].attrib.get('type') == 'application/x.ixbrl-viewer+json'
             assert body[3].text == 'END IXBRL VIEWER EXTENSIONS'
+
+    @patch('arelle.XbrlConst.conceptLabel', 'http://www.xbrl.org/2003/arcrole/concept-label')
+    @patch('arelle.XbrlConst.conceptReference', 'http://www.xbrl.org/2003/arcrole/concept-reference')
+    @patch('arelle.XbrlConst.parentChild', 'http://www.xbrl.org/2003/arcrole/parent-child')
+    @patch('arelle.XbrlConst.summationItem', 'http://www.xbrl.org/2003/arcrole/summation-item')
+    @patch('arelle.XbrlConst.standardLabel', 'http://www.xbrl.org/2003/role/label')
+    @patch('arelle.XbrlConst.documentationLabel', 'http://www.xbrl.org/2003/role/documentation')
+    @patch('arelle.XbrlConst.dimensionDefault', 'http://xbrl.org/int/dim/arcrole/dimension-default')
+    def test_createViewerTaxonomy(self):
+        js_uri = 'ixbrlviewer.js'
+        builder = IXBRLViewerBuilder([self.modelXbrlTaxonomy])
+        result = builder.createViewer(js_uri, showValidations = False, saveJson=True)
+        assert len(result.files) == 2
+        assert result.files[0].filename == "xbrlviewer.html"
+        assert result.files[1].filename == "ixbrlviewer.html.json"
+        body = result.files[0].xmlDocument.getroot()[0]
+        assert body[0].text, 'BEGIN IXBRL VIEWER EXTENSIONS'
+        assert body[1].attrib.get('src') == js_uri
+        assert body[1].attrib.get('type') == 'text/javascript'
+        assert body[2].attrib.get('type') == 'application/x.ixbrl-viewer+json'
+        assert body[3].text == 'END IXBRL VIEWER EXTENSIONS'
+
+        jsdata = json.loads(body[2].text)
+        assert "validation" not in jsdata
+        reportData = jsdata["sourceReports"][0]["targetReports"][0]
+        assert set(reportData["facts"]) == set()
+        
+        assert reportData["localDocs"] == {
+            'local-schema.xsd': ['schema'],
+            'local-pres-linkbase.xml': ['presLinkbase'],
+            'local-calc-linkbase.xml': ['calcLinkbase'],
+            'local-def-linkbase.xml': ['defLinkbase'],
+            'local-label-linkbase.xml': ['labelLinkbase'],
+            'local-ref-linkbase.xml': ['refLinkbase'],
+            'local-unrecognized-linkbase.xml': ['unrecognizedLinkbase'],
+        }
+
+        assert jsdata["sourceReports"][0]["docSetFiles"] == ["a.html"]

@@ -381,6 +381,7 @@ class IXBRLViewerBuilder:
             useStubViewer: bool = False,
             showValidations: bool = True,
             packageDownloadURL: str | None = None,
+            saveJson: bool = False
     ) -> iXBRLViewer | None:
         """
         Create an iXBRL file with XBRL data as a JSON blob, and script tags added.
@@ -487,7 +488,13 @@ class IXBRLViewerBuilder:
             self.taxonomyData["filingDocuments"] = filingDocZipName
 
         if not self.addViewerData(iv.files[0], scriptUrl):
-            return None
+            if saveJson:
+                filename = iv.files[0].filename
+                iv.files.remove(iv.files[0])
+                iv.filenames.remove(filename)
+                iv.addFile(iXBRLViewerJsonFile(filename + ".json", self.taxonomyData))
+            else:
+                return None
 
         return iv
 
@@ -498,6 +505,20 @@ class iXBRLViewerFile:
         self.filename = filename
         self.xmlDocument = xmlDocument
 
+    def serialize(self, fout):
+        writer = XHTMLSerializer(fout)
+        writer.serialize(self.xmlDocument)
+
+
+class iXBRLViewerJsonFile:
+
+    def __init__(self, filename, json):
+        self.filename = filename
+        self.json = json
+
+    def serialize(self, fout):
+        s = json.dumps(self.json, indent=1, allow_nan=False)
+        fout.write(s.encode("utf-8"))
 
 class iXBRLViewer:
 
@@ -553,8 +574,7 @@ class iXBRLViewer:
                 for f in self.files:
                     self.logger_model.info(INFO_MESSAGE_CODE, "Saving in output zip %s" % f.filename)
                     with zout.open(f.filename, "w") as fout:
-                        writer = XHTMLSerializer(fout)
-                        writer.serialize(f.xmlDocument)
+                        f.serialize(fout)
                 if self.filingDocuments:
                     filename = os.path.basename(self.filingDocuments)
                     self.logger_model.info(INFO_MESSAGE_CODE, "Writing %s" % filename)
@@ -569,8 +589,7 @@ class iXBRLViewer:
                 filename = os.path.join(destination, f.filename)
                 self.logger_model.info(INFO_MESSAGE_CODE, "Writing %s" % filename)
                 with open(filename, "wb") as fout:
-                    writer = XHTMLSerializer(fout)
-                    writer.serialize(f.xmlDocument)
+                    f.serialize(fout)
             if self.filingDocuments:
                 filename = os.path.basename(self.filingDocuments)
                 self.logger_model.info(INFO_MESSAGE_CODE, "Writing %s" % filename)
@@ -579,7 +598,7 @@ class iXBRLViewer:
                 self._copyScript(Path(destination), copyScriptPath)
         else:
             if len(self.files) > 1:
-                self.logger_model.error(ERROR_MESSAGE_CODE, "More than one file in input, but output is not a directory")
+                self.logger_model.error(ERROR_MESSAGE_CODE, "More than one file in input, but output is not a directory" + repr(self.files))
             elif destination.endswith(os.sep):
                 # Looks like a directory, but isn't one
                 self.logger_model.error(ERROR_MESSAGE_CODE, "Directory %s does not exist" % destination)
@@ -589,8 +608,7 @@ class iXBRLViewer:
             else:
                 self.logger_model.info(INFO_MESSAGE_CODE, "Writing %s" % destination)
                 with open(destination, "wb") as fout:
-                    writer = XHTMLSerializer(fout)
-                    writer.serialize(self.files[0].xmlDocument)
+                    self.files[0].serialize(fout)
                 if self.filingDocuments:
                     filename = os.path.basename(self.filingDocuments)
                     self.logger_model.info(INFO_MESSAGE_CODE, "Writing %s" % filename)
