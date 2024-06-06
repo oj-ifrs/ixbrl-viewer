@@ -1,14 +1,14 @@
+import $ from 'jquery'
 import { viewerUniqueId } from './util.js';
 import { Fact } from './fact.js';
-import { debug } from 'webpack';
 
 export class Editor {
 
-    async addTag (reportIndex, selection, viewer, reportSet) {
+    async addTag (reportIndex, selection, viewer, reportSet, inspector) {
         const range = selection.getRangeAt(0);
         const firstNode = range.startContainer;
         const lastNode = range.endContainer;
-        const n = surroundSelectionWith(selection, document.createElement('ix:nonFraction'))        
+        const n = surroundSelectionWith(selection, document.createElement('ix:nonFraction'))      
         const vuid = viewerUniqueId(reportIndex, n.getAttribute("id"));
 
         let nodes = viewer._findOrCreateWrapperNode(n);
@@ -19,20 +19,32 @@ export class Editor {
         let ixn = viewer._getOrCreateIXNode(vuid, nodes, docIndex);
         viewer._docOrderItemIndex.addItem(vuid, docIndex);
 
-        viewer.showItemById(vuid);
-        debugger;
+        viewer._ixNodeMap[vuid] = ixn;
+        viewer.itemContinuationMap[vuid] = []
         reportSet._ixNodeMap[vuid] = ixn;
-        reportSet.setIXNodeMap(this._ixNodeMap);
-        report = reportSet.reports[reportIndex]
+        const report = reportSet.reports[reportIndex]
         const factData = {
             "a": {
              "c": null,
-             "e": null,
+             "e": "unknown:unknown",
              "p": null
             },
             "v": null
            }
-        reportSet._items[vuid] = new Fact(report, vuid, factData);
+        reportSet._items[vuid] = new Fact(report, vuid, factData);        
+        n.setAttribute('style', 'color: red; backgroundColor: transparent;');
+
+        //bind handlers
+        nodes
+            .on("click", function (e) {
+                e.stopPropagation();
+                viewer.selectElementByClick($(this));
+            })
+            .on("mouseenter", function (e) { viewer._mouseEnter($(this)) })
+            .on("mouseleave", function (e) { viewer._mouseLeave($(this)) });
+        
+
+        inspector.selectItem(vuid)
     }
 }
 
@@ -42,11 +54,7 @@ function surroundSelectionWith(selection, wrapper) {
     const range = selection.getRangeAt(0).cloneRange()
 
     if (range.endOffset - range.startOffset > 0) {
-      
       wrapper.id = crypto.randomUUID() 
-      wrapper.setAttribute('style', 'color: red; backgroundColor: transparent;')
-
-      console.log('range', range)
 
       range.surroundContents(wrapper)
       selection.removeAllRanges()

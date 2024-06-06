@@ -264,7 +264,8 @@ export class Viewer {
             const outerText = $(tableNode).text();
             const start = outerText.indexOf(innerText);
             const wrapper = outerText.substring(0, start) + outerText.substring(start + innerText.length);
-            if (!/[0-9A-Za-z]/.test(wrapper)) {
+            //if (!/[0-9A-Za-z]/.test(wrapper)) {
+            if (!/[\S]/.test(wrapper)) { //be more restrictive about 'non-significant content'!
                 nodes.push(tableNode)
             } 
         }

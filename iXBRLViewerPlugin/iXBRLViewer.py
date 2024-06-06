@@ -21,6 +21,7 @@ from arelle.ModelValue import QName, INVALIDixVALUE
 from arelle.ModelXbrl import ModelXbrl
 from arelle.UrlUtil import isHttpUrl
 from arelle.ValidateXbrlCalcs import inferredDecimals
+from arelle.ModelInstanceObject import ModelFact
 from lxml import etree
 
 from .constants import DEFAULT_JS_FILENAME, DEFAULT_OUTPUT_NAME, ERROR_MESSAGE_CODE, FEATURE_CONFIGS, INFO_MESSAGE_CODE
@@ -225,7 +226,7 @@ class IXBRLViewerBuilder:
 
         return errors
 
-    def addFact(self, report: ModelXbrl, f):
+    def addFact(self, report: ModelXbrl, f: ModelFact):
         if f.id is None:
             f.set("id","ixv-%d" % (self.idGen))
 
@@ -262,7 +263,10 @@ class IXBRLViewerBuilder:
 
         if f.format is not None:
             factData["f"] = str(f.format)
-
+        
+        if f.sign is not None:
+            factData["s"] = str(f.sign)
+ 
         if f.isNumeric:
             if f.unit is not None and len(f.unit.measures[0]):
                 aspects['u'] = self.oimUnitString(f.unit)

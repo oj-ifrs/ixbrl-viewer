@@ -22,15 +22,20 @@ import { ReportSetOutline } from './outline.js';
 import { DIMENSIONS_KEY, DocumentSummary, MEMBERS_KEY, PRIMARY_ITEMS_KEY, TOTAL_KEY } from './summary.js'
 import { Saver} from "./save.js";
 import { Editor} from "./edit.js";
+import { toDegrees } from 'chart.js/helpers';
+import { Transformations } from './transformations.js';
 
 const SEARCH_PAGE_SIZE = 100
 
+
 export class Inspector {
+
     constructor(iv) {
         this._iv = iv;
         this._viewerOptions = new ViewerOptions()
         this._currentItem = null;
         this._useCalc11 = true;
+        this._editmode = true;
     }
 
     i18nInit() {
@@ -118,25 +123,28 @@ export class Inspector {
                 inspector._optionsMenu = new Menu($("#display-options-menu"));
                 inspector.buildDisplayOptionsMenu();
 
-                inspector._save = new Saver()
-                
-                $("#inspector .controls .save-button").on("click", () => {
-                    let frame = $("#ixv #iframe-container").find("iframe");
-                    let h = frame[0].contentDocument.documentElement.outerHTML;
-                    inspector._save.saveFrame(h);
-                });
+                if (inspector._editmode) {
+                    inspector._save = new Saver()
+                    
+                    $("#inspector .controls .save-button").on("click", () => {
+                        let frame = $("#ixv #iframe-container").find("iframe");
+                        let h = frame[0].contentDocument.documentElement.outerHTML;
+                        inspector._save.saveFrame(h);
+                    });
 
-                inspector._edit = new Editor()
-                $("#inspector .controls .add-button").on("click", function () {   
-                    const frame = viewer.currentDocument();  
-                    const reportIndex = frame.data("report-index");
-                    inspector._edit.addTag(
-                        reportIndex,
-                        frame[0].contentWindow.getSelection(),
-                        viewer,
-                        reportSet
-                    );
-                });
+                    inspector._edit = new Editor()
+                    $("#inspector .controls .add-button").on("click", function () {   
+                        const frame = viewer.currentDocument();  
+                        const reportIndex = frame.data("report-index");
+                        inspector._edit.addTag(
+                            reportIndex,
+                            frame[0].contentWindow.getSelection(),
+                            viewer,
+                            reportSet,
+                            inspector
+                        );
+                    });
+                }
 
                 $("#ixv").localize();
 
@@ -462,6 +470,33 @@ export class Inspector {
             }
         });
         return scalesOptions;
+    }
+
+    _getAllScalesOptions(fact) {
+        const allScales = [undefined, "-3","-2","-1","0","1","2","3","4","5","6","7","8","9"]
+        const scalesOptions = {}
+        allScales.forEach(scale => {
+            var label = fact.report.getScaleLabel(scale, fact.unit());
+            if (!label) label = i18next.t('common.unscaled');
+            scalesOptions[scale] = label
+        });
+        return scalesOptions;
+    }
+
+    _getAllConcepts() {
+        const concepts = {}
+        for (const f of this._reportSet.facts()) {            
+            concepts[f.conceptName()] = f.getLabelOrName("std", true)
+        }
+        return concepts;
+    }
+
+    _getAllPeriods() {
+        const periods = {}
+        for (const f of this._reportSet.facts()) {            
+            periods[f.period()] = f.periodString();
+        }
+        return periods;
     }
 
     resetSearchFilters() {
@@ -970,6 +1005,30 @@ export class Inspector {
             valueSpan.wrapInner("<i></i>");
         }
 
+        //editing options
+        if (this._editmode) {
+            //transformations
+            const transforms = new Set(Object.keys(this.transformations()));
+            let t = item.transformation();
+            if (!t) t = i18next.t('common.none');
+            transforms.add(t);
+            //build a mini table
+            tr.wrapInner($('<td><tr></tr></td>'));
+            const innerRow = $('<tr></tr>');
+            this._appendSelect('transformation', innerRow, t, Array.from(transforms).map(v=>[v,v]));
+            //units
+                                    // for (const unit of this._reportSet.getUsedUnits()) {
+                        //     $("<option>")
+                        //             .attr("value", unit)
+                        //             .text(`${this._reportSet.getUnit(unit)?.label()} (${unit})`)
+                        //             .appendTo('#search-filter-units select');
+                        // }
+            this._appendSelect('unit', innerRow, item.unitLabel(), [[item.unitLabel(),item.unitLabel()]])
+            this._appendSelect('sign', innerRow, item.sign(), [[undefined,''],['-','-']])
+            tr.find('td').prepend(innerRow);
+            const rawRow = $('<tr></tr>').text(item.ixNode.textContent());
+            tr.find('td').prepend(rawRow);
+        }
     }
 
     showTextBlock(item) {
@@ -1011,8 +1070,67 @@ export class Inspector {
             let factHTML;
             const title = fs.minimallyUniqueLabel(fact);
             if (fact instanceof Fact) {
-                factHTML = $(require('../html/fact-details.html')); 
-                $('.std-label', factHTML).text(fact.getLabelOrName("std", true));
+                if (this._editmode) {
+                    factHTML = $(require('../html/edit-fact-details.html'));
+                    var onChange = (event) => {
+                        console.log("onChange");
+                        const scaleSelect = $('.scaleSelect', factHTML);
+                        const s = scaleSelect?.val();
+                        const t = this.transformations();
+                        fact.update({
+                            scale: s,
+                            transformations: t
+                        });                        
+                        this.update();
+                    };
+                    const concepts = this._getAllConcepts();
+                    //$('.std-label', factHTML).text(fact.getLabelOrName("std", true));
+                    this._appendSelect('conceptSelect', $('.std-label', factHTML), fact.conceptName(), Object.entries(concepts));
+                    //const periods = []
+                    //for (const key of Object.keys(this._search.periods)) {
+                    //    periods.push([key, this._search.periods[key]]);
+                    //}
+                    const periods = this._getAllPeriods();
+                    this._appendSelect('periodSelect', $('tr.period td', factHTML), fact.period().key(), periods);
+                    
+                    if (!fact.isNumeric() || fact.isNil()) {
+                        const accuracyTD = $('tr.accuracy td', factHTML).empty().append(fact.readableAccuracy());
+                        accuracyTD.wrapInner("<i></i>");    
+                        const scaleTD = $('tr.scale td', factHTML).empty().append(fact.readableScale());
+                        scaleTD.wrapInner("<i></i>");
+                    } else {                       
+                        // const scalesOptions = this._getScalesOptions();
+                        // for (const scale of Object.keys(scalesOptions).sort()) {
+                        //         $("<option>")
+                        //                 .attr("value", scale)
+                        //                 .text(scalesOptions[scale])
+                        //                 .appendTo('#search-filter-scales select');
+                        // }
+                        //const accuracies = [[fact.readableAccuracy(),fact.readableAccuracy()]]
+                        const scalesOptions = this._getAllScalesOptions(fact);
+                        const scales = Object.keys(scalesOptions).sort().map(
+                            (scale)=>[scale, scalesOptions[scale]]);
+                        this._appendSelect('accuracySelect', $('tr.accuracy td', factHTML), -fact.decimals(), scales);
+                        //const scales = [[fact.readableScale(), fact.readableScale()]];
+                        this._appendSelect('scaleSelect', $('tr.scale td', factHTML), fact.scale(), scales, onChange);                        
+                    }
+                } else {
+                    factHTML = $(require('../html/fact-details.html'));
+                    $('.std-label', factHTML).text(fact.getLabelOrName("std", true));
+                    $('tr.period td', factHTML)
+                    .text(fact.periodString());
+                    
+                    const accuracyTD = $('tr.accuracy td', factHTML).empty().append(fact.readableAccuracy());
+                    if (!fact.isNumeric() || fact.isNil()) {
+                        accuracyTD.wrapInner("<i></i>");
+                    }
+    
+                    const scaleTD = $('tr.scale td', factHTML).empty().append(fact.readableScale());
+                    if (!fact.isNumeric() || fact.isNil()) {
+                        scaleTD.wrapInner("<i></i>");
+                    }
+                }
+
                 $('.documentation', factHTML).text(fact.getLabel("doc") || "");
                 $('tr.concept td', factHTML)
                     .find('.text')
@@ -1021,9 +1139,8 @@ export class Inspector {
                     .end()
                     .find('.clipboard-copy')
                         .data('cb-text', fact.conceptName())
-                    .end();
-                $('tr.period td', factHTML)
-                    .text(fact.periodString());
+                    .end();                    
+
                 if (fact.isNumeric()) {
                     $('tr.period td', factHTML).append(
                         $("<span></span>") 
@@ -1034,16 +1151,6 @@ export class Inspector {
                 }
                 this._updateEntityIdentifier(fact, factHTML);
                 this._updateValue(fact, false, factHTML);
-
-                const accuracyTD = $('tr.accuracy td', factHTML).empty().append(fact.readableAccuracy());
-                if (!fact.isNumeric() || fact.isNil()) {
-                    accuracyTD.wrapInner("<i></i>");
-                }
-
-                const scaleTD = $('tr.scale td', factHTML).empty().append(fact.readableScale());
-                if (!fact.isNumeric() || fact.isNil()) {
-                    scaleTD.wrapInner("<i></i>");
-                }
 
                 $('#dimensions', factHTML).empty();
                 const taxonomyDefinedAspects = fact.aspects().filter(a => a.isTaxonomyDefined());
@@ -1082,6 +1189,19 @@ export class Inspector {
             );
         }
         return a;
+    }
+
+    _appendSelect(_class, appendTo, value, value_text_array, onChange = ()=>{}) {
+        var select = $('<select class="'+_class+'"></select>');
+        value_text_array.forEach((val) =>  {
+            select.append($("<option>")
+                            .attr("value", val[0])
+                            .text(val[1]));
+        });
+        appendTo.append(select);
+        select.val(value)
+              .trigger("change")
+              .on("change", onChange);        
     }
 
     analyseDimension(fact, dimensions) {
@@ -1244,5 +1364,9 @@ export class Inspector {
             const mb = new MessageBox("Validation errors", message, "View Details", "Dismiss");
             mb.show(() => this.showValidationReport());
         }
+    }
+
+    transformations() {
+        return Transformations.transformations;
     }
 }

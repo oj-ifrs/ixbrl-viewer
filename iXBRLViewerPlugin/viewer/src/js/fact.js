@@ -406,4 +406,99 @@ export class Fact {
     targetDocument() {
         return this.report.targetDocument();
     }
+
+    transformation() {
+        return this.f?.f;
+    }
+
+    sign() {
+        return this.f?.s;
+    }
+
+    update({scale=undefined, transformations = {}}) {
+        if (scale && scale!=this.scale) {
+            this.ixNode.scale = scale;            
+        }
+        if (this.isNumeric()) {
+            this.deriveValue(transformations)
+        }
+    }
+
+    setInvalid() {
+        this.f.err = 'INVALID_IX_VALUE'
+    }
+
+    /*
+     * Derives value property of Fact
+     * for relevant inner text nodes aggregated and transformed as needed.
+    */
+    deriveValue(transformations) {
+        //this.xValid = UNVALIDATED // may not be initialized otherwise
+        this.xValue = null
+        const f = this.transformation()
+        var v = this.ixNode.textContent() //TODO handle escaping etc.
+        if (f) {
+            try {
+                if (f in transformations) {
+                    v = transformations[f](v);
+                } else {
+                    this.setInvalid();
+                    throw "ixtFunctionNotAvailable";
+                } 
+            } catch (e) {          
+                this.setInvalid();
+                throw err;
+            }
+        }
+        if (this.isNil()) {
+            this._ixValue = v
+        }
+        else {
+            if (/*this.localName == "nonNumeric"*/ !this.isNumeric())
+                this._ixValue = v
+            /*else if (this.localName == "tuple")
+                this._ixValue = ""*/
+            /*else if (this.localName == "fraction") {
+                if (this.xValid >= VALID)
+                    this._ixValue = str(this.xValue)
+                else
+                    this._ixValue = "NaN"
+            }*/
+            else {  // determine string value of transformed value
+                const negate = this.sign() ? -1 : 1
+                var num = undefined;
+                try {
+                    // concept may be unknown or invalid but transformation would still occur
+                    // use decimal so all number forms work properly
+                    num = Decimal(v)
+                }
+                catch (e) {
+                    this.setInvalid()
+                    throw "Invalid value for {} number: {}".format(this.localName, v)
+                }
+                try {
+                    const scale = this.scale();
+                    if (scale) 
+                        num *= 10 ** Decimal(scale)
+                    num *= negate
+                    /*if (isinf(num))
+                        this._ixValue =  (num < 0 ? "-INF" : "INF")
+                    else if (isnan(num))
+                        this._ixValue = "NaN"
+                    else{*/
+                        /*if (num == num.to_integral() && (".0" not in v || this.isInteger))
+                            num = num.quantize(DECIMALONE) // drop any .0*/
+                        this._ixValue = num.toString()
+                    /*}*/
+                } catch (e) {
+                    this.setInvalid()
+                    throw "Invalid value for {} scale {} for number {}".format(this.localName, scale, v)
+                }
+            }
+        }
+        this.f.v = this._ixValue
+        return this._ixValue
+    }
+    
+
 }
